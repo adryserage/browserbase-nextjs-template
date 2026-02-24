@@ -1,12 +1,32 @@
 /**
  * Salesforce Aura API Client for ISED Portal
  * 
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * ❓ HOW CAN WE ACCESS SALESFORCE API FROM A PUBLIC PAGE?
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * 
+ * ANSWER: Public Salesforce Experience Cloud sites INTENTIONALLY expose
+ * the /s/sfsites/aura endpoint for guest users. This is how their own
+ * frontend JavaScript fetches data.
+ * 
+ * When you visit https://innovation.ised-isde.canada.ca/ in a browser,
+ * the page's JavaScript makes POST requests to /s/sfsites/aura to get
+ * data. We're doing the SAME thing, just without the browser rendering.
+ * 
+ * KEY FACTS:
+ * • Token for guest users = "undefined" (literal string)
+ * • No authentication required for public data
+ * • Same data the browser gets, just JSON instead of rendered HTML
+ * • This is INTENTIONAL Salesforce architecture, not a hack
+ * • Documented by Mandiant/Google (AuraInspector, 2026)
+ * 
+ * See AURA_API_EXPLAINED.md for full explanation with examples.
+ * 
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * 
  * This module implements Strategy A from the technical report:
  * Direct HTTP communication with Salesforce Aura endpoint to bypass
  * browser rendering and reduce scraping time from 8 hours to ~5 minutes.
- * 
- * Based on research by Mandiant/Google (AuraInspector, January 2026)
- * and Varonis on Salesforce Experience Cloud internal endpoints.
  * 
  * Performance: 100x faster than browser-based scraping
  * - Browser approach: ~19 seconds per item × 1,500 = 8 hours
@@ -98,7 +118,9 @@ export class AuraAPIClient {
   private baseUrl: string;
   private endpoint: string;
   private context: AuraContext | null = null;
-  private token: string = "undefined"; // For guest users on public portals
+  private token: string = "undefined"; // ← For GUEST USERS on public portals, this is the literal string "undefined"
+                                       // This is how Salesforce knows you're accessing as a guest
+                                       // It's NOT a security bypass - it's intentional public access
   private sessionHeaders: Record<string, string> = {};
 
   constructor(baseUrl: string = AURA_CONFIG.baseUrl) {
@@ -108,7 +130,21 @@ export class AuraAPIClient {
 
   /**
    * Initialize the client by capturing Aura context from the portal
-   * This is done once at the start of scraping
+   * 
+   * HOW THIS WORKS:
+   * 1. The public ISED site loads JavaScript in your browser
+   * 2. That JavaScript makes POST requests to /s/sfsites/aura
+   * 3. We're doing the SAME thing the browser does, just directly
+   * 4. No authentication needed - the site is PUBLIC
+   * 
+   * MANUAL STEP REQUIRED:
+   * - Open Chrome DevTools on the ISED site
+   * - Go to Network tab, filter by "aura"
+   * - Click on a subsidy
+   * - Copy the POST request parameters
+   * - Update this code with the real descriptor and context
+   * 
+   * This is done once at the start of scraping.
    */
   async initialize(): Promise<void> {
     console.log("🔧 Initializing Aura API client...");

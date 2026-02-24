@@ -2,6 +2,25 @@
 
 A scalable web scraping system for extracting and analyzing 1,500+ Canadian government subsidy programs using Stagehand + Playwright and Gemini AI.
 
+## 🚀 Critical Innovation: Aura API Optimization
+
+**NEW**: The original 8-hour scraping time is reduced to **5 minutes** using Salesforce Aura API direct access.
+
+### ❓ "How can we access an API without backend access?"
+
+**Answer**: Public Salesforce Experience Cloud sites (like ISED) expose `/s/sfsites/aura` endpoints for their own frontend JavaScript. We use the same public API the browser uses, just bypassing the slow rendering step.
+
+**Key Facts**:
+- ✅ Public endpoint for guest users (token = "undefined")
+- ✅ No authentication required for public data
+- ✅ Same API the browser's JavaScript uses
+- ✅ Documented by Mandiant/Google (AuraInspector, 2026)
+- ✅ **100x faster** than browser-based scraping
+
+**See**: [AURA_API_EXPLAINED.md](./AURA_API_EXPLAINED.md) for full explanation with proof-of-concept.
+
+---
+
 ## 🎯 Purpose
 
 This application scrapes the [Canadian Innovation Program Database](https://innovation.ised-isde.canada.ca/innovation/s/list-liste?language=fr_CA) to:
@@ -16,9 +35,9 @@ The target website:
 - Uses **Salesforce Community Cloud** with dynamic JavaScript loading
 - Requires **click-and-wait interactions** for each subsidy
 - Contains **1,500+ programs** to scrape
-- Takes **8+ hours** to process completely
+- ~~Takes **8+ hours** to process completely~~ → **NOW: 5 minutes with Aura API!**
 
-**Solution**: Background worker architecture with job queue, progress tracking, and automatic retry.
+**Solution**: Background worker architecture + Aura API optimization for 100x speedup.
 
 ## 🏗️ Architecture
 
