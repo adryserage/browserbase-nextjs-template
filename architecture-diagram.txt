@@ -1,0 +1,244 @@
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    CANADIAN SUBSIDY SCRAPER ARCHITECTURE                     │
+│                     Handling 8+ Hour Scraping Challenge                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                          USER INTERACTION FLOW                             │
+└───────────────────────────────────────────────────────────────────────────┘
+
+   User Browser                    Vercel (Next.js)              Database
+   ─────────────                   ────────────────              ────────
+        │                                 │                          │
+        │  1. Click "Start Scraping"      │                          │
+        ├────────────────────────────────►│                          │
+        │                                 │  2. Create job record    │
+        │                                 ├─────────────────────────►│
+        │  3. Job ID + Status "queued"    │                          │
+        │◄────────────────────────────────┤                          │
+        │                                 │                          │
+        │  4. Poll for status every 30s   │                          │
+        ├────────────────────────────────►│  5. Query job progress   │
+        │                                 ├─────────────────────────►│
+        │  6. Progress: 342/1500 (22.8%)  │◄─────────────────────────┤
+        │◄────────────────────────────────┤                          │
+        │                                 │                          │
+        │  ... 8 hours later ...          │                          │
+        │                                 │                          │
+        │  7. Status "completed"          │                          │
+        │◄────────────────────────────────┤                          │
+        │                                 │                          │
+        │  8. Browse subsidies            │                          │
+        ├────────────────────────────────►│  9. Query subsidies      │
+        │                                 ├─────────────────────────►│
+        │  10. List of 1500 subsidies     │◄─────────────────────────┤
+        │◄────────────────────────────────┤                          │
+
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                         WORKER SCRAPING FLOW                               │
+└───────────────────────────────────────────────────────────────────────────┘
+
+   Worker (Railway/Render)        Target Website              Database
+   ───────────────────────        ──────────────              ────────
+        │                                 │                       │
+        │  1. Start job                   │                       │
+        │  ─────────────                  │                       │
+        │                                 │                       │
+        │  2. Navigate to listing         │                       │
+        ├────────────────────────────────►│                       │
+        │  3. Page loaded                 │                       │
+        │◄────────────────────────────────┤                       │
+        │                                 │                       │
+        │  4. Extract list (1500 items)   │                       │
+        ├────────────────────────────────►│                       │
+        │  5. List of program names       │                       │
+        │◄────────────────────────────────┤                       │
+        │                                 │                       │
+        ╞═════════════════════════════════╪═══════════════════════╡
+        │     FOR EACH SUBSIDY (1-1500)   │                       │
+        ╞═════════════════════════════════╪═══════════════════════╡
+        │                                 │                       │
+        │  6. Click on subsidy #342       │                       │
+        ├────────────────────────────────►│                       │
+        │  7. Detail panel loads          │                       │
+        │◄────────────────────────────────┤                       │
+        │  (wait 2 seconds)               │                       │
+        │                                 │                       │
+        │  8. Extract structured data     │                       │
+        │  (Stagehand AI extraction)      │                       │
+        ├────────────────────────────────►│                       │
+        │  9. Program details JSON        │                       │
+        │◄────────────────────────────────┤                       │
+        │                                 │                       │
+        │  10. Save to database           │                       │
+        ├─────────────────────────────────┼──────────────────────►│
+        │                                 │                       │
+        │  11. Update progress (342/1500) │                       │
+        ├─────────────────────────────────┼──────────────────────►│
+        │                                 │                       │
+        │  12. Navigate back to list      │                       │
+        ├────────────────────────────────►│                       │
+        │◄────────────────────────────────┤                       │
+        │                                 │                       │
+        │  Every 10 items: Save checkpoint│                       │
+        ├─────────────────────────────────┼──────────────────────►│
+        │                                 │                       │
+        ╞═════════════════════════════════╪═══════════════════════╡
+        │     END LOOP                    │                       │
+        ╞═════════════════════════════════╪═══════════════════════╡
+        │                                 │                       │
+        │  13. Mark job complete          │                       │
+        ├─────────────────────────────────┼──────────────────────►│
+        │                                 │                       │
+        │  Duration: 8h 23m               │                       │
+        │  Success: 1488 / Failed: 12     │                       │
+        │                                 │                       │
+
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                          SYSTEM COMPONENTS                                 │
+└───────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────┐
+│      Frontend (Next.js)          │     Deployment: Vercel
+│  ┌────────────────────────────┐  │     Cost: $0-20/month
+│  │   Dashboard UI             │  │     Timeout: 300s (not used for scraping)
+│  │   - Start jobs             │  │
+│  │   - View progress          │  │     Capabilities:
+│  │   - Browse subsidies       │  │     • Job management UI
+│  │   - Search/filter          │  │     • Progress tracking
+│  │   - Generate reports       │  │     • Subsidy browsing
+│  └────────────────────────────┘  │     • API endpoints
+└────────┬─────────────────────────┘
+         │ HTTP/REST
+         │
+         ├────────────────┬──────────────────┐
+         │                │                  │
+         ▼                ▼                  ▼
+┌────────────────┐ ┌──────────────┐ ┌──────────────────────┐
+│   Database     │ │   Worker     │ │   AI (Gemini)        │
+│   (Postgres)   │ │   Process    │ │                      │
+└────────────────┘ └──────────────┘ └──────────────────────┘
+   Deployment:        Deployment:       API: Google Cloud
+   Vercel/Supabase    Railway/Render    Cost: $1-5/month
+   Cost: $0-10/mo     Cost: $5-10/mo
+                                        Capabilities:
+   Tables:            Capabilities:     • Generate reports
+   • scrape_jobs      • Long-running    • Eligibility analysis
+   • subsidies        • No timeouts     • 1M token context
+   • snapshots        • Local Playwright
+   • reports          • Auto-retry
+   • failed_items     • Checkpointing
+
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                        RELIABILITY FEATURES                                │
+└───────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Checkpointing (Every 10 Items)                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Items: [1] [2] [3] [4] [5] [6] [7] [8] [9] [10] ✓ CHECKPOINT          │
+│         [11] [12] [13] [14] [15] [16] [17] [18] [19] [20] ✓ CHECKPOINT │
+│         [21] [22] [23] 💥 CRASH!                                        │
+│                         │                                                │
+│                         └──► Resume from checkpoint at item [21]        │
+│                              Max loss: 9 items                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Automatic Retry (Exponential Backoff)                                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Item 342: "Innovation Grant"                                           │
+│  Attempt 1: ❌ Failed (timeout)  → Wait 1s                              │
+│  Attempt 2: ❌ Failed (timeout)  → Wait 2s                              │
+│  Attempt 3: ✅ Success!                                                 │
+│                                                                          │
+│  Item 343: "Research Fund"                                              │
+│  Attempt 1: ❌ Failed (404)      → Wait 1s                              │
+│  Attempt 2: ❌ Failed (404)      → Wait 2s                              │
+│  Attempt 3: ❌ Failed (404)      → Log as failed, continue              │
+└─────────────────────────────────────────────────────────────────────────┘
+
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                         PERFORMANCE OPTIONS                                │
+└───────────────────────────────────────────────────────────────────────────┘
+
+Sequential (1 worker)              Parallel (3 workers)
+───────────────────                ────────────────────
+  Browser 1                          Browser 1  Browser 2  Browser 3
+     │                                  │          │          │
+  Item 1                             Item 1     Item 2     Item 3
+  Item 2                             Item 4     Item 5     Item 6
+  Item 3                             Item 7     Item 8     Item 9
+  Item 4                               ...        ...        ...
+   ...
+  Item 1500                         Duration: 3-4 hours
+                                    RAM: 1.5GB
+Duration: 8-10 hours                Cost: $10/month
+RAM: 512MB                          Reliability: Good
+Cost: $5/month                      Risk: May trigger rate limits
+Reliability: Highest
+
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                           COST COMPARISON                                  │
+└───────────────────────────────────────────────────────────────────────────┘
+
+Traditional (Browserbase Cloud Browsers)    Our Solution (Local Playwright)
+───────────────────────────────────────    ────────────────────────────────
+• Browser minutes: $0.10/minute            • Worker: $5-10/month (fixed)
+• 8 hours = 480 minutes                    • Database: $0-10/month
+• 480 × $0.10 = $48 per scrape             • Frontend: $0-20/month
+• Weekly scrapes = $192/month              • Total: $5-40/month
+• Monthly scrapes = $48/month              
+                                           
+Pros:                                      Pros:
+✓ No infrastructure management             ✓ 80-95% cost savings
+✓ Live view URLs                           ✓ Full control
+✓ Managed Playwright updates               ✓ Unlimited scraping
+
+Cons:                                      Cons:
+✗ Very expensive at scale                  ✗ Manage worker infrastructure
+✗ Per-minute billing                       ✗ Handle Playwright updates
+✗ 300s serverless timeout                  ✗ No live view URLs
+
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                         WHY THIS ARCHITECTURE?                             │
+└───────────────────────────────────────────────────────────────────────────┘
+
+Problem: 8+ hours of scraping
+❌ Serverless functions → Max 300s timeout
+❌ Browser tab → Can't run for hours
+❌ Chained functions → Unreliable, expensive
+✅ Background worker → No timeout, dedicated resources
+
+Problem: 1,500+ click interactions
+❌ Static scraping → Need dynamic rendering
+❌ API endpoints → No API available
+✅ Stagehand + Playwright → AI-powered click & extract
+
+Problem: Salesforce dynamic loading
+❌ Simple HTTP → Content not rendered
+❌ Fast scraping → Missing data
+✅ Wait + AI extraction → Full content capture
+
+Problem: 8-hour cost
+❌ Cloud browsers → $48+ per scrape
+✅ Local Playwright → $5-10/month unlimited
+
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                         SUCCESS METRICS                                    │
+└───────────────────────────────────────────────────────────────────────────┘
+
+Duration:        8-10 hours (sequential) | 3-4 hours (parallel)
+Success Rate:    ~95% (with retries)
+Cost:            $5-40/month (vs $192/month cloud)
+Reliability:     Auto-resume from checkpoints
+Scalability:     Handles unlimited items (not timeout-bound)
+Maintenance:     Weekly incremental updates (1-2 hours)
+
