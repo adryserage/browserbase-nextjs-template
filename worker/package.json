@@ -1,0 +1,20 @@
+{
+  "name": "subsidy-scraper-worker",
+  "version": "1.0.0",
+  "description": "Background worker for Canadian subsidy scraping",
+  "main": "scraper.ts",
+  "scripts": {
+    "start": "tsx scraper.ts",
+    "dev": "tsx watch scraper.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@browserbasehq/stagehand": "^3.0.8",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,124 @@
+// Prisma schema for subsidy scraping system
+// Compatible with Vercel Postgres, Supabase, or PlanetScale
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_URL")
+}
+
+// Scraping job tracking
+model ScrapeJob {
+  id              String   @id @default(cuid())
+  status          String   // 'queued' | 'running' | 'completed' | 'failed' | 'paused'
+  mode            String   // 'full' | 'incremental' | 'specific'
+  totalItems      Int?
+  completedItems  Int      @default(0)
+  failedItems     Int      @default(0)
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  errorMessage    String?
+  lastCheckpoint  String?  // JSON string for resume data
+  
+  @@index([status])
+  @@index([startedAt])
+  @@map("scrape_jobs")
+}
+
+// Main subsidy data (evidence packets)
+model Subsidy {
+  id                    String              @id @default(cuid())
+  externalId            String?             @unique  // ID from source website
+  programName           String
+  programNameFr         String?
+  url                   String
+  language              String              // 'en' | 'fr' | 'both'
+  
+  // Extracted structured data
+  eligibilityCriteria   String[]            // Array of criteria
+  minAmount             Decimal?
+  maxAmount             Decimal?
+  fundingType           String?             // Grant, loan, tax credit, etc.
+  applicationSteps      String[]            // Ordered list of steps
+  deadlineDate          DateTime?
+  deadlineText          String?
+  description           String?
+  targetAudience        String[]            // SMEs, startups, researchers, etc.
+  sector                String[]            // Technology, manufacturing, etc.
+  province              String[]            // ON, QC, BC, etc.
+  
+  // Metadata
+  contentHash           String              // SHA-256 for change detection
+  firstScrapedAt        DateTime            @default(now())
+  lastScrapedAt         DateTime            @updatedAt
+  scrapeCount           Int                 @default(1)
+  isActive              Boolean             @default(true)
+  
+  // Raw evidence (optional, for audit)
+  rawHtml               String?             @db.Text
+  
+  // Relations
+  snapshots             SubsidySnapshot[]
+  reports               SubsidyReport[]
+  
+  @@index([programName])
+  @@index([lastScrapedAt])
+  @@index([deadlineDate])
+  @@index([isActive])
+  @@map("subsidies")
+}
+
+// Historical snapshots for change detection
+model SubsidySnapshot {
+  id                  String    @id @default(cuid())
+  subsidyId           String
+  contentHash         String
+  changesDetected     String[]  // Array of changed fields
+  scrapedAt           DateTime  @default(now())
+  previousSnapshotId  String?
+  
+  // Snapshot data (JSON)
+  snapshotData        String    @db.Text  // JSON string of full subsidy data
+  
+  subsidy             Subsidy   @relation(fields: [subsidyId], references: [id], onDelete: Cascade)
+  
+  @@index([subsidyId])
+  @@index([scrapedAt])
+  @@map("subsidy_snapshots")
+}
+
+// Generated reports (Gemini output cache)
+model SubsidyReport {
+  id              String    @id @default(cuid())
+  subsidyId       String
+  reportType      String    // 'eligibility' | 'full' | 'summary'
+  reportContent   String    @db.Text  // Markdown or HTML
+  generatedAt     DateTime  @default(now())
+  modelUsed       String    // 'gemini-1.5-pro'
+  tokenCount      Int?
+  
+  subsidy         Subsidy   @relation(fields: [subsidyId], references: [id], onDelete: Cascade)
+  
+  @@index([subsidyId])
+  @@index([generatedAt])
+  @@map("subsidy_reports")
+}
+
+// Failed scraping attempts for retry
+model FailedItem {
+  id              String    @id @default(cuid())
+  jobId           String
+  url             String
+  itemName        String?
+  errorMessage    String    @db.Text
+  attemptCount    Int       @default(1)
+  lastAttemptAt   DateTime  @default(now())
+  resolved        Boolean   @default(false)
+  
+  @@index([jobId])
+  @@index([resolved])
+  @@map("failed_items")
+}

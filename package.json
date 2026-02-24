@@ -1,31 +1,35 @@
 {
-  "name": "research-agent-template",
+  "name": "canadian-subsidy-scraper",
   "version": "1.0.0",
-  "description": "AI-powered research agent using Stagehand + Browserbase for parallel browser automation",
-  "author": "Browserbase <support@browserbase.com>",
+  "description": "Canadian subsidy scraper using Stagehand + local Playwright with Gemini AI report generation",
+  "author": "Adryserage",
   "license": "MIT",
   "private": true,
   "keywords": [
-    "browserbase",
     "stagehand",
     "nextjs",
     "ai",
-    "research",
+    "scraping",
+    "subsidies",
     "browser-automation",
-    "anthropic",
-    "claude"
+    "gemini",
+    "canada"
   ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "worker": "cd worker && npm start",
+    "worker:dev": "cd worker && npm run dev",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.41",
-    "@ai-sdk/gateway": "^3.0.39",
-    "@browserbasehq/sdk": "^2.6.0",
+    "@ai-sdk/google": "^1.0.12",
     "@browserbasehq/stagehand": "^3.0.8",
+    "@prisma/client": "^6.2.0",
     "ai": "^6.0.78",
     "next": "16.1.6",
     "react": "19.2.4",
@@ -40,7 +44,9 @@
     "@types/react-dom": "^19.2.3",
     "eslint": "^10.0.0",
     "eslint-config-next": "16.1.6",
+    "prisma": "^6.2.0",
     "tailwindcss": "^4.1.18",
+    "tsx": "^4.19.2",
     "typescript": "^5.9.3"
   }
 }
