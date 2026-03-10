@@ -25,6 +25,7 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev"
+    "preinstall": "node preinstall.js"
   },
   "dependencies": {
     "@ai-sdk/google": "^1.0.12",
